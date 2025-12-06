@@ -13,6 +13,7 @@ from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from dotenv import load_dotenv
 import os
+import re
 
 # Import reusable modules
 from agent_functions import research_agent, formatter_agent, validator_agent, finalizer_agent
@@ -53,6 +54,79 @@ validator_llm = ChatGroq(
     groq_api_key=os.getenv("GROQ_API_KEY"),
     temperature=0.1
 )
+
+def sanitize_topic(topic: str) -> str:
+    """
+    Sanitize user input to prevent prompt injection attacks
+
+    Args:
+        topic: User-provided research topic
+
+    Returns:
+        Sanitized topic string
+
+    Raises:
+        ValueError: If topic fails validation checks
+    """
+    # 1. Length validation
+    if len(topic) > 200:
+        raise ValueError("Topic must be less than 200 characters")
+
+    # 2. Remove control characters and normalize whitespace
+    # Replace newlines/carriage returns with spaces (breaks XML tag strategy)
+    topic = topic.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
+
+    # Remove other control characters
+    topic = ''.join(char for char in topic if char.isprintable() or char.isspace())
+
+    # Normalize multiple spaces to single space
+    topic = ' '.join(topic.split())
+
+    # 3. Detect common prompt injection patterns (case-insensitive)
+    injection_patterns = [
+        r'\bignore\s+previous\s+instructions?\b',
+        r'\bignore\s+all\s+previous\b',
+        r'\bforget\s+about\b',
+        r'\bforget\s+everything\b',
+        r'\byou\s+are\s+now\b',
+        r'\binstead\s+of\b',
+        r'\bdisregard\b',
+        r'\bnew\s+instructions?\b',
+        r'\bsystem\s*:\s*\b',
+        r'\boverride\b',
+        r'\bpretend\s+to\s+be\b',
+    ]
+
+    topic_lower = topic.lower()
+    for pattern in injection_patterns:
+        if re.search(pattern, topic_lower):
+            raise ValueError(f"Topic contains suspicious command pattern: '{pattern}'")
+
+    # 4. Block markdown/XML structure injection
+    # Check for excessive markdown headers
+    if topic.count('#') > 2:
+        raise ValueError("Topic contains too many '#' characters")
+
+    # Check for code blocks
+    if '```' in topic or '<script>' in topic.lower():
+        raise ValueError("Topic contains code block or script tags")
+
+    # Check for XML/HTML tag-like patterns that could break our XML strategy
+    if re.search(r'</?\w+>', topic):
+        raise ValueError("Topic contains XML/HTML-like tags")
+
+    # 5. Character whitelist validation (relaxed for legitimate research topics)
+    # Allow: letters, numbers, spaces, and common punctuation
+    if not re.match(r'^[a-zA-Z0-9\s\.,\-&()\'":;!?]+$', topic):
+        raise ValueError("Topic contains invalid characters. Use only letters, numbers, and basic punctuation.")
+
+    # 6. Final cleanup
+    topic = topic.strip()
+
+    if len(topic) < 3:
+        raise ValueError("Topic must be at least 3 characters long")
+
+    return topic
 
 # Create wrapper functions that pass the LLMs to the agent functions
 def research_agent_wrapper(state: ResearchState) -> ResearchState:
@@ -97,9 +171,16 @@ def create_research_graph():
 
 def run_research(topic: str, thread_id: str = "research_session") -> Dict[str, Any]:
     """Run the complete research workflow for a given topic"""
-    
+
+    # SECURITY: Sanitize topic input before processing
+    try:
+        topic = sanitize_topic(topic)
+    except ValueError as e:
+        print(f"❌ Invalid topic: {str(e)}")
+        return {"error": f"Invalid topic: {str(e)}"}
+
     print(f"🚀 Starting research on: {topic}")
-    
+
     # Create the graph
     graph = create_research_graph()
     
@@ -151,7 +232,20 @@ def main():
     if not topic:
         topic = "Artificial Intelligence in retail sector"
         print(f"Using default topic: {topic}")
-    
+
+    # Validate topic before running research
+    try:
+        sanitized_topic = sanitize_topic(topic)
+        print(f"✓ Topic validated: {sanitized_topic}")
+    except ValueError as e:
+        print(f"\n❌ Error: {str(e)}")
+        print("\nTips for valid topics:")
+        print("  - Keep it under 200 characters")
+        print("  - Use only letters, numbers, and basic punctuation")
+        print("  - Avoid special characters like #, <, >, or code blocks")
+        print("  - Don't include instructions or commands")
+        return
+
     # Run research
     result = run_research(topic)
     
