@@ -3,8 +3,14 @@
 Test script to verify LangGraph 1.0 and LangChain 1.1 upgrade
 """
 
+import sys
 import os
-from research import run_research
+
+# Add paths
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'scripts'))
+
+from run_research import run_research
 
 def test_research_system():
     """Run a quick test of the research system"""

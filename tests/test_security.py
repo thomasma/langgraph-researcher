@@ -3,7 +3,11 @@
 Security test suite for prompt injection defenses
 """
 
-from research import sanitize_topic
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'src'))
+
+from security import sanitize_topic
 
 def test_sanitization():
     """Test input sanitization against various attack vectors"""
