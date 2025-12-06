@@ -20,10 +20,7 @@ A modular, reusable multi-agent system built with LangGraph for conducting compr
 git clone <repository-url>
 cd langgraph-researcher
 
-# Install dependencies
-pip install -e .
-
-# Or using uv
+# Install dependencies using uv
 uv sync
 ```
 
@@ -40,13 +37,13 @@ SERPER_API_KEY=your-serper-key
 ### Run Research
 
 ```bash
-python scripts/run_research.py
+uv run python scripts/run_research.py
 ```
 
 Or use the demo:
 
 ```bash
-python scripts/demo.py
+uv run python scripts/demo.py
 ```
 
 ## Project Structure
@@ -159,13 +156,13 @@ Run the test suite:
 
 ```bash
 # Security tests
-python tests/test_security.py
+uv run python tests/test_security.py
 
 # End-to-end injection tests
-python tests/test_injection_e2e.py
+uv run python tests/test_injection_e2e.py
 
 # Upgrade compatibility tests
-python tests/test_upgrade.py
+uv run python tests/test_upgrade.py
 ```
 
 ## Documentation
